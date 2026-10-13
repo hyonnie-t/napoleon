@@ -130,7 +130,7 @@ function swapAdj(arr, k) { const a = arr.slice(); [a[k], a[k + 1]] = [a[k + 1], 
 
     // 자료 2
     ok((await page.innerText('h2')).startsWith('자료 2.'), '자료 2 화면');
-    ok((await page.innerText('.topbar')).includes('자료 2/2'), '진행 표시 자료 2/2');
+    ok((await page.innerText('#screen .eyebrow')).includes('자료 2/2'), '진행 표시 자료 2/2');
     await page.click('text=평가하러 가기');
     ok(await page.isVisible('#errViewD'), '자료 2: 고르기 막힘');
     await page.check('input[name="viewD"][value="나쁘게 본다"]');

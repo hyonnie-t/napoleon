@@ -265,3 +265,46 @@ details > .details-body { padding: 0 var(--x4) var(--x4); display: flex; flex-di
 /* 낱말 풀이 밑줄(glossary.js가 button.term 으로 감싼다) */
 button.term { padding: 10px 2px; margin: -10px 0; font-size: inherit; line-height: inherit; font-weight: inherit; color: inherit;
   text-decoration-style: dotted; text-decoration-thickness: 1.5px; text-decoration-color: var(--stroke-brand-solid); text-underline-offset: 3px; }
+
+/* ───────── 가독성 손질 (2026-10-13) ───────── */
+:root { --bg-page: #edf0f8; --shadow-card: 0 1px 2px #17181b0f, 0 6px 20px #17181b0f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg-page: var(--gray-00); --shadow-card: none; } }
+body { background: var(--bg-page); }
+.topbar-inner, .screen { max-width: 760px; }
+.stepbar { max-width: 760px; }
+.screen p { line-height: 27px; }
+.card { padding: var(--x5); gap: var(--x4); box-shadow: var(--shadow-card); border-color: transparent; }
+.card > h2, .card > h1 { font-size: 22px; line-height: 30px; }
+.eyebrow { margin: 0 0 calc(-1 * var(--x2)); font-weight: 700; color: var(--fg-brand); }
+.zone-title { display: flex; align-items: center; gap: var(--x2); font-weight: 700; color: var(--fg-neutral-muted); }
+.zone-title::before { content: ''; width: 4px; height: 18px; border-radius: 2px; background: var(--stroke-brand-solid); }
+
+/* 자료: 읽는 곳과 답하는 곳을 나눈다 */
+.source-cite { background: transparent; padding: 0 0 0 var(--x3); border-left-width: 3px; border-radius: 0; }
+.passages { gap: var(--x4); }
+.passage { background: var(--bg-layer-default); box-shadow: inset 4px 0 0 var(--stroke-brand-solid), 0 0 0 1px var(--stroke-neutral-subtle);
+  border-radius: var(--r3); padding: var(--x4) var(--x4) var(--x4) var(--x5); gap: var(--x3); }
+.passage-label { align-self: flex-start; padding: 2px var(--x3); border-radius: var(--r-full); background: var(--bg-brand-weak); color: var(--fg-brand-contrast); }
+.passage-text { font-size: 18px; line-height: 31px; }
+.passage details { background: var(--bg-layer-basement); }
+.task { display: flex; flex-direction: column; gap: var(--x4); padding: var(--x4); border-radius: var(--r4); background: var(--bg-layer-basement); box-shadow: inset 0 0 0 1px var(--stroke-neutral-subtle); }
+.task details { background: var(--bg-layer-default); }
+.task .textarea, .task .input { background: var(--bg-layer-default); }
+
+/* 연표 */
+.tl-link { background: transparent; border-left: 3px dashed var(--stroke-neutral-muted); border-radius: 0; padding: var(--x1) var(--x3); margin-bottom: var(--x3); }
+.tl-card { background: var(--bg-layer-basement); border-color: transparent; }
+.tl-node { width: 36px; height: 36px; }
+.tl-item { grid-template-columns: 36px minmax(0, 1fr); }
+.tl-rail::before { width: 4px; margin-left: -2px; }
+
+/* 낱말 밑줄은 눈에 덜 띄게(많을 때 글 읽기를 방해하지 않도록) */
+button.term { text-decoration-thickness: 1px; text-decoration-color: var(--stroke-neutral-muted); text-underline-offset: 4px; }
+
+/* 마무리 */
+.recap { background: var(--bg-layer-default); box-shadow: inset 0 0 0 1px var(--stroke-neutral-subtle); padding: var(--x4); gap: var(--x3); }
+.btn-sm { min-height: var(--tap); padding: 0 var(--x4); background: transparent; box-shadow: inset 0 0 0 1px var(--stroke-brand-solid); color: var(--fg-brand); }
+.btn-sm:active:not(:disabled) { background: var(--bg-brand-weak); }
+.info-card { background: var(--bg-layer-basement); padding: var(--x4) var(--x4) var(--x4) var(--x5); }
+.step-list { gap: var(--x2); }
+@media (min-width: 600px) { .card { padding: var(--x6); } .passage-text { font-size: 19px; line-height: 33px; } }

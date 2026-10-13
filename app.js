@@ -18,7 +18,6 @@ const UI = {
   timelineLead: '순서를 모두 맞혔어요. 연표와 교과서 설명을 읽어 보세요.',
   toSources: '자료 읽으러 가기',
   sourceTitle: function (no, title) { return '자료 ' + no + '. ' + title; },
-  sourceProgress: function (no) { return '자료 ' + no + '/2'; },
   glossToggle: '용어 풀이',
   hintToggle: '힌트 보기',
   required: '필수', optional: '선택',
@@ -36,6 +35,8 @@ const UI = {
   needAll: '모든 필수 칸을 채우면 복사할 수 있어요',
   restart: '처음부터 다시하기',
   restartTitle: '처음부터 다시 할까요?', restartBody: '쓴 내용이 모두 지워져요.', cancel: '취소', erase: '지우기',
+  stepTag: { review: '복습 1/2', timeline: '복습 2/2', s1: '자료 1/2', s2: '자료 2/2', judge: '평가 1/3', evidence: '평가 2/3', extra: '평가 3/3', summary: '마무리' },
+  readTitle: '읽어 보기', taskTitle: '내 생각 쓰기',
   needChoice: '선택지를 골라 주세요',
   needReason: '이유를 한 문장 적어 주세요',
   needQuote: '글에서 찾은 말을 적어 주세요',
@@ -190,6 +191,10 @@ function textareaField(value, onInput, labelText, rows) {
   ta.addEventListener('input', function () { onInput(ta.value); });
   return ta;
 }
+/* 화면 위쪽: 지금 어느 단계인지 알려 주는 작은 글자 + 제목 */
+function titleBlock(step, title) {
+  return [h('p', { class: 'eyebrow', text: UI.stepTag[step] }), h('h2', { text: title })];
+}
 function labelWithTag(text, required) {
   return h('span', {}, [text + ' ', h('span', { class: required ? 'req' : 'muted', text: '(' + (required ? UI.required : UI.optional) + ')' })]);
 }
@@ -218,7 +223,6 @@ function renderBar() {
     bar.appendChild(h('li', { text: n, 'data-state': i < idx ? 'done' : '', 'aria-current': i === idx ? 'step' : null }));
   });
   document.getElementById('progressFill').style.width = Math.round(STEPS.indexOf(state.step) / (STEPS.length - 1) * 100) + '%';
-  document.getElementById('progressText').textContent = state.step === 's1' ? UI.sourceProgress(1) : state.step === 's2' ? UI.sourceProgress(2) : '';
 }
 
 /* ───────── 이동 ───────── */
@@ -274,7 +278,7 @@ function renderIntro(root) {
 /* ───────── 화면: 복습 (순서 맞추기) ───────── */
 function renderReview(root) {
   const card = h('section', { class: 'card' });
-  card.appendChild(h('h2', { text: UI.reviewTitle }));
+  titleBlock('review', UI.reviewTitle).forEach(function (n) { card.appendChild(n); });
   card.appendChild(h('p', { class: 'lead', text: UI.reviewDesc }));
   const feedback = h('div', { id: 'reviewFeedback', 'aria-live': 'polite' });
   card.appendChild(feedback);
@@ -391,13 +395,12 @@ function renderTimeline(root) {
       items.push(h('li', { class: 'tl-item is-link' }, [h('div', { class: 'tl-rail' }), h('p', { class: 'tl-link', text: LINKS[i] })]));
     }
   });
-  root.appendChild(h('section', { class: 'card' }, [
-    h('h2', { text: UI.timelineTitle }),
+  root.appendChild(h('section', { class: 'card' }, titleBlock('timeline', UI.timelineTitle).concat([
     h('p', { class: 'lead', text: UI.timelineLead }),
     h('ol', { class: 'timeline' }, items),
     h('div', { class: 'callout' }, [svg(ICON.info, 20), h('p', { text: REVIEW_NOTE })]),
     navRow({ prev: function () { go('review'); }, next: afterStep, nextLabel: nextLabel(UI.toSources) })
-  ]));
+  ])));
 }
 
 /* ───────── 화면: 자료 1·2 ───────── */
@@ -423,12 +426,12 @@ function passageCard(src, p, idx) {
   ]);
 }
 function sourceHead(src) {
-  return [
-    h('h2', { text: UI.sourceTitle(src.no, src.title) }),
+  return titleBlock('s' + src.no, UI.sourceTitle(src.no, src.title)).concat([
     h('p', { class: 'source-cite', text: src.cite }),
     h('p', { text: src.intro }),
+    h('h3', { class: 'zone-title', text: UI.readTitle }),
     h('div', { class: 'passages' }, src.passages.map(function (p, i) { return passageCard(src, p, i); }))
-  ];
+  ]);
 }
 function viewItems(task) { return task.q1.choices.map(function (c) { return { value: c, label: c }; }); }
 
@@ -438,10 +441,12 @@ function renderSource1(root) {
   const group = radioGroup(labelWithTag(task.q1.label, true), 'viewA', viewItems(task), state.a.view, function (v) { state.a.view = v; clearError(err1); storeSet(); });
   const ta = textareaField(state.a.quote, function (v) { state.a.quote = v; clearError(err2, ta); storeSet(); }, task.q2.label, 2);
   const card = h('section', { class: 'card' }, sourceHead(src).concat([
-    h('hr', { class: 'divider' }),
-    group, err1,
-    h('div', { class: 'field' }, [h('label', { class: 'field-label' }, labelWithTag(task.q2.label, true)), ta, err2]),
-    hintBox(task.hint),
+    h('div', { class: 'task' }, [
+      h('h3', { class: 'zone-title', text: UI.taskTitle }),
+      group, err1,
+      h('div', { class: 'field' }, [h('label', { class: 'field-label' }, labelWithTag(task.q2.label, true)), ta, err2]),
+      hintBox(task.hint)
+    ]),
     navRow({
       prev: function () { saveNow(); go('timeline'); },
       nextLabel: nextLabel(UI.toNextSource),
@@ -469,11 +474,13 @@ function renderSource2(root) {
         h('p', { class: 'passage-text', text: a2.text })
       ]))
     ]),
-    h('hr', { class: 'divider' }),
-    group, err1,
-    h('div', { class: 'field' }, [h('label', { class: 'field-label' }, labelWithTag(task.q2.label, true)), ta2, err2]),
-    h('div', { class: 'field' }, [h('label', { class: 'field-label' }, labelWithTag(task.q3.label, false)), ta3]),
-    hintBox(task.hint),
+    h('div', { class: 'task' }, [
+      h('h3', { class: 'zone-title', text: UI.taskTitle }),
+      group, err1,
+      h('div', { class: 'field' }, [h('label', { class: 'field-label' }, labelWithTag(task.q2.label, true)), ta2, err2]),
+      h('div', { class: 'field' }, [h('label', { class: 'field-label' }, labelWithTag(task.q3.label, false)), ta3]),
+      hintBox(task.hint)
+    ]),
     navRow({
       prev: function () { go('s1'); },
       nextLabel: nextLabel(UI.toJudge),
@@ -506,8 +513,7 @@ function renderJudge(root) {
   const group = radioGroup(labelWithTag(JUDGE.q, true), 'judge', JUDGE.options.map(function (o) { return { value: o.id, label: o.text }; }), state.judge,
     function (v) { state.judge = v; clearError(err1); storeSet(); });
   const ta = textareaField(state.judgeReason, function (v) { state.judgeReason = v; clearError(err2, ta); storeSet(); }, JUDGE.reasonLabel, 3);
-  root.appendChild(h('section', { class: 'card' }, [
-    h('h2', { text: UI.judgeTitle }),
+  root.appendChild(h('section', { class: 'card' }, titleBlock('judge', UI.judgeTitle).concat([
     myAnswersBox(),
     group, err1,
     h('div', { class: 'field' }, [h('label', { class: 'field-label' }, labelWithTag(JUDGE.reasonLabel, true)), ta, err2]),
@@ -521,7 +527,7 @@ function renderJudge(root) {
         afterStep();
       }
     })
-  ]));
+  ])));
 }
 
 /* ───────── 화면: 근거 고르기 ───────── */
@@ -553,8 +559,7 @@ function renderEvidence(root) {
       return h('div', { class: 'passage' }, [h('p', { class: 'passage-label', text: '자료 ' + it.src.no + ' · ' + it.p.label }), h('p', { class: 'passage-text', text: it.p.text })]);
     }))
   ]);
-  root.appendChild(h('section', { class: 'card' }, [
-    h('h2', { text: UI.evidenceTitle }),
+  root.appendChild(h('section', { class: 'card' }, titleBlock('evidence', UI.evidenceTitle).concat([
     judgeBox(),
     reread,
     fs, errChip,
@@ -569,7 +574,7 @@ function renderEvidence(root) {
         afterStep();
       }
     })
-  ]));
+  ])));
 }
 
 /* ───────── 화면: 추가 정보·재판단 (판단·근거를 저장한 뒤에만 열린다) ───────── */
@@ -578,10 +583,9 @@ function renderExtra(root) {
   const group = radioGroup(labelWithTag(COMMENTARY.reLabel, true), 're', COMMENTARY.reOptions.map(function (o) { return { value: o.id, label: o.text }; }), state.re,
     function (v) { state.re = v; clearError(errRe); storeSet(); });
   const ta = textareaField(state.reReason, function (v) { state.reReason = v; storeSet(); }, COMMENTARY.reReasonLabel, 2);
-  root.appendChild(h('section', { class: 'card' }, [
-    h('h2', { text: UI.extraTitle }),
+  root.appendChild(h('section', { class: 'card' }, titleBlock('extra', UI.extraTitle).concat([
     h('p', { class: 'lead', text: COMMENTARY.lead })
-  ].concat(COMMENTARY.cards.map(function (c) {
+  ], COMMENTARY.cards.map(function (c) {
       return h('div', { class: 'info-card' }, [h('p', { class: 'info-head', text: c.head }), h('p', { text: c.text })]);
     }), [
     h('p', { class: 'cite-line', text: COMMENTARY.cite }),
@@ -658,7 +662,7 @@ function recapBlock(title, step, rows) {
   return h('div', { class: 'recap' }, [
     h('div', { class: 'recap-head' }, [
       h('h3', { text: title }),
-      h('button', { type: 'button', class: 'btn', 'data-go-step': step, onclick: function () { state.fromSummary = true; go(step); } }, UI.editStep)
+      h('button', { type: 'button', class: 'btn btn-sm', 'data-go-step': step, onclick: function () { state.fromSummary = true; go(step); } }, UI.editStep)
     ])
   ].concat(rows.map(function (r) {
     return h('p', {}, [h('span', { class: 'q', text: r[0] + ': ' }), h('span', { class: 'a', text: r[1] })]);
@@ -670,8 +674,7 @@ function renderSummary(root) {
   const ok = allDone();
   const copyBtn = h('button', { type: 'button', class: 'btn btn-primary btn-wide', id: 'copyBtn', disabled: !ok, onclick: function () { copyText(buildCopyText()); } }, UI.copy);
   const submitBtn = h('button', { type: 'button', class: 'btn btn-wide', id: 'subBtn', disabled: !ok, onclick: function (e) { submitRecord(e.currentTarget); } }, state.submitted ? UI.submitAgain : UI.submit);
-  root.appendChild(h('section', { class: 'card' }, [
-    h('h2', { text: UI.summaryTitle }),
+  root.appendChild(h('section', { class: 'card' }, titleBlock('summary', UI.summaryTitle).concat([
     h('p', { class: 'lead', text: UI.summaryLead }),
     recapBlock(UI.summaryReview, 'review', [[UI.summaryReview, state.attempts + '번 만에 완성']]),
     recapBlock(UI.summaryA, 's1', [[UI.viewLabel, a.view], [UI.quoteLabel, a.quote]]),
@@ -683,7 +686,7 @@ function renderSummary(root) {
     submitBtn,
     ok ? null : h('p', { class: 'muted', text: UI.needAll }),
     h('button', { type: 'button', class: 'btn btn-outline btn-wide', onclick: confirmRestart }, UI.restart)
-  ]));
+  ])));
 }
 
 /* ───────── 모달: 처음부터 다시하기 ───────── */
@@ -761,7 +764,7 @@ function init() {
   }
   state.step = gate(state.step);
   if (state.step !== 'intro') startGuard();
-  Glossary.start({ terms: GLOSSARY, unique: true, skip: ['.topbar', '.recap', '.modal', '.choices', '.my-judge', '.source-cite', '.cite-line', '.order-name'] });
+  Glossary.start({ terms: GLOSSARY, unique: true, skip: ['.topbar', '#stepBar', '.recap', '.modal', '.choices', '.my-judge', '.source-cite', '.cite-line', '.order-name'] });
   render();
 }
 init();

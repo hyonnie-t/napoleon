@@ -39,7 +39,7 @@ const FULL = { sid: '20512', name: '테스트', submitted: false, step: 'summary
         });
         return out;
       });
-      const bar = await page.evaluate(() => [...document.querySelectorAll('.topbar *')].filter(e => e.children.length === 0 && e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.textContent));
+      const bar = await page.evaluate(() => [...document.querySelectorAll('.topbar *, #stepBar, #stepBar *')].filter(e => e.children.length === 0 && e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.textContent));
       const issues = r.small.length + r.tap.length + bar.length + (r.hscroll ? 1 : 0);
       if (issues) { bad++; console.log(`[FAIL] ${scheme} ${width} ${step}`, JSON.stringify({ small: r.small, tap: r.tap, bar, hscroll: r.hscroll })); }
     }
