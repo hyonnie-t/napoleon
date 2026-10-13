@@ -6,7 +6,7 @@ function loadPlaywright() {
   throw new Error('playwright 없음');
 }
 const URL_ = process.argv[2] || 'http://localhost:8765/index.html';
-const FULL = { step: 'summary', order: ['estates','tennis','bastille','rights','war','terror','coup'], attempts: 2, reviewDone: true, fromSummary: false,
+const FULL = { sid: '20512', name: '테스트', submitted: false, step: 'summary', order: ['estates','tennis','bastille','rights','war','terror','coup'], attempts: 2, reviewDone: true, fromSummary: false,
   a: { view: '좋게 본다', quote: '합법적인 권리' }, d: { view: '나쁘게 본다', diff: '합법 대 위헌', why: '' },
   judge: 'C', judgeReason: '정하기 어렵다', chips: ['A2', 'D1'], chipWhy: '쓴 때가 다르다', re: 'keep', reReason: '' };
 (async () => {

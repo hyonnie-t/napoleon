@@ -44,6 +44,15 @@ function swapAdj(arr, k) { const a = arr.slice(); [a[k], a[k + 1]] = [a[k + 1], 
     await page.reload();
 
     // 시작 → 복습
+    // 학번·이름: 비우면 막힘 → 입력 후 시작
+    await page.click('text=시작하기');
+    ok(await page.isVisible('#sidErr'), '시작: 학번 비어 있으면 막힘');
+    await page.fill('#sid', '20a1');
+    ok(await page.inputValue('#sid') === '201', '학번에는 숫자만 들어감');
+    await page.fill('#sid', '20512');
+    await page.click('text=시작하기');
+    ok(await page.isVisible('#nameErr'), '시작: 이름 비어 있으면 막힘');
+    await page.fill('#sname', '테스트');
     await page.click('text=시작하기');
     ok(await page.$('#orderList') !== null, '복습 화면 진입');
     const start = await orderOf(page);
@@ -195,13 +204,54 @@ function swapAdj(arr, k) { const a = arr.slice(); [a[k], a[k + 1]] = [a[k + 1], 
     ok(copied === expected, '복사 문자열이 5-5 형식과 일치');
     if (copied !== expected) { console.log(copied); console.log('---'); console.log(expected); }
 
+    // 제출: 백엔드 응답을 가짜로 대신하고 body를 확인한다
+    let posted = null;
+    await page.route('**/script.google.com/**', route => { posted = JSON.parse(route.request().postData()); route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ result: 'ok' }) }); });
+    await page.click('#subBtn');
+    await page.waitForTimeout(400);
+    ok(posted && posted.studentId === '20512' && posted.studentName === '테스트' && posted.gameName === '나폴레옹_쿠데타평가', '기록하기: 학번·이름·gameName 전송');
+    ok(posted && posted.reflection === copied, '기록하기: reflection이 복사 문자열과 같음');
+    ok(posted && ['focusLeaveCount', 'focusLeaveSec', 'pasteChars'].every(k => k in posted), '기록하기: FocusGuard payload 포함');
+    ok((await page.innerText('#subBtn')) === '다시 기록하기', '기록 성공 뒤 버튼 문구');
+
     // 처음부터 다시하기(모달)
     await page.click('text=처음부터 다시하기');
     ok(await page.isVisible('.modal'), '앱 내 모달 확인');
     await page.click('.modal >> text=지우기');
-    ok((await page.innerText('h1')).includes('나폴레옹의 쿠데타') && await page.evaluate(() => state.reviewDone === false && state.judge === ''), '처음부터 다시하기: 초기화');
+    ok((await page.innerText('h1')).includes('나폴레옹의 쿠데타') && await page.evaluate(() => state.reviewDone === false && state.judge === '' && state.sid === '20512'), '처음부터 다시하기: 초기화(학번·이름은 유지)');
 
     ok(errs.length === 0, '콘솔 에러 0건 ' + (errs.length ? JSON.stringify(errs) : ''));
+    await ctx.close();
+  }
+  // ?sid=&name= 자동채움, ?preview=1
+  {
+    const ctx = await browser.newContext({ viewport: { width: 360, height: 900 } });
+    const page = await ctx.newPage();
+    let posts = 0;
+    await page.route('**/script.google.com/**', route => { posts++; route.fulfill({ status: 200, contentType: 'application/json', body: '{"result":"ok"}' }); });
+    await page.goto(URL_ + '?sid=30512&name=%EC%88%98%EC%A7%84');
+    ok(await page.inputValue('#sid') === '30512' && await page.inputValue('#sname') === '수진', '?sid=&name= 자동채움');
+    await page.goto(URL_ + '?preview=1');
+    ok(await page.isVisible('#previewBanner') && await page.inputValue('#sid') === '20599', '?preview=1: 배너 + 학번·이름 자동채움');
+    await page.click('text=시작하기');
+    ok(await page.$('#orderList') !== null, '?preview=1: 입력 없이 시작');
+    ok(await page.evaluate(() => localStorage.getItem(CONFIG.STORE_KEY)) === null, '?preview=1: 저장하지 않음');
+    await page.evaluate(() => { state.reviewDone = true; state.a = { view: 'x', quote: 'x' }; state.d = { view: 'x', diff: 'x', why: '' }; state.judge = 'A'; state.judgeReason = 'x'; state.chips = ['A1']; state.chipWhy = 'x'; state.re = 'keep'; go('summary'); });
+    await page.click('#subBtn');
+    await page.waitForTimeout(300);
+    ok(posts === 0 && (await page.innerText('#toast')).includes('미리보기에서는 저장하지 않아요'), '?preview=1: 서버로 보내지 않음');
+    await ctx.close();
+  }
+  // 낱말 풀이 밑줄
+  {
+    const ctx = await browser.newContext({ viewport: { width: 360, height: 900 } });
+    const page = await ctx.newPage();
+    await page.goto(URL_ + '?preview=1');
+    await page.click('text=시작하기');
+    await page.evaluate(() => { state.reviewDone = true; state.a = { view: 'x', quote: 'x' }; go('s2'); });
+    ok(await page.$$eval('#screen button.term', e => e.length) > 0, '낱말 풀이 밑줄이 그어짐(자료 2 화면)');
+    await page.click('#screen button.term:visible >> nth=0');
+    ok(await page.isVisible('#glSheet'), '밑줄을 누르면 뜻 시트가 열림');
     await ctx.close();
   }
   await browser.close();

@@ -258,3 +258,10 @@ details > .details-body { padding: 0 var(--x4) var(--x4); display: flex; flex-di
 
 /* 폰 폭에서는 번호를 빼서 사건 이름이 한 글자씩 꺾이지 않게 한다 */
 @media (max-width: 420px) { .order-no { display: none; } .order-name { font-size: 16px; } }
+
+/* 학번·이름 */
+.id-grid { display: grid; grid-template-columns: 1fr; gap: var(--x3); }
+@media (min-width: 480px) { .id-grid { grid-template-columns: 1fr 1fr; } }
+/* 낱말 풀이 밑줄(glossary.js가 button.term 으로 감싼다) */
+button.term { padding: 10px 2px; margin: -10px 0; font-size: inherit; line-height: inherit; font-weight: inherit; color: inherit;
+  text-decoration-style: dotted; text-decoration-thickness: 1.5px; text-decoration-color: var(--stroke-brand-solid); text-underline-offset: 3px; }

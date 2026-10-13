@@ -44,7 +44,11 @@ const UI = {
   needRe: '하나를 골라 주세요',
   summaryReview: '복습', summaryA: '자료 1', summaryD: '자료 2', summaryJudge: '평가', summaryEv: '근거', summaryRe: '정보 뒤',
   viewLabel: '쿠데타를 보는 눈', quoteLabel: '그렇게 읽은 말', diffLabel: '두 자료의 다른 점', whyLabel: '이유',
-  judgeLabel: '판단', pickedLabel: '고른 자료'
+  judgeLabel: '판단', pickedLabel: '고른 자료',
+  idTitle: '누구의 기록인지 알려 줘요', sidLabel: '학번 (5자리)', nameLabel: '이름',
+  needSid: '학번 5자리를 숫자로 적어 주세요', needName: '이름을 적어 주세요',
+  submit: '기록하기', submitAgain: '다시 기록하기', submitting: '기록하는 중', submitted: '기록했어요',
+  submitFail: '기록하지 못했어요. 다시 시도해 주세요', submitPreview: '미리보기에서는 저장하지 않아요'
 };
 
 const STEPS = ['intro', 'review', 'timeline', 's1', 's2', 'judge', 'evidence', 'extra', 'summary'];
@@ -65,8 +69,8 @@ function shuffledOrder() {
   } while (ids.every(function (id, i) { return id === CORRECT_ORDER[i]; }));
   return ids;
 }
-function freshState() {
-  return { step: 'intro', order: shuffledOrder(), attempts: 0, reviewDone: false, fromSummary: false,
+function freshState(sid, name) {
+  return { sid: sid || '', name: name || '', submitted: false, step: 'intro', order: shuffledOrder(), attempts: 0, reviewDone: false, fromSummary: false,
     a: { view: '', quote: '' }, d: { view: '', diff: '', why: '' },
     judge: '', judgeReason: '', chips: [], chipWhy: '', re: '', reReason: '' };
 }
@@ -150,6 +154,7 @@ function stepDone(step) {
 }
 /* 앞 단계를 마치지 않았으면 그 단계로 돌려보낸다(추가 정보는 판단·근거를 저장한 뒤에만 열린다) */
 function gate(step) {
+  if (step !== 'intro' && !/^\d{5}$/.test(state.sid)) return 'intro';
   const idx = STEPS.indexOf(step);
   for (let i = 1; i < idx; i++) if (!stepDone(STEPS[i])) return STEPS[i];
   return step;
@@ -239,13 +244,31 @@ function prevHandler() { return function () { go(neighbor(-1)); }; }
 
 /* ───────── 화면: 시작 ───────── */
 function renderIntro(root) {
+  const sidInput = h('input', { class: 'input', id: 'sid', inputmode: 'numeric', maxlength: 5, autocomplete: 'off', 'aria-describedby': 'sidErr' });
+  sidInput.value = state.sid;
+  const nameInput = h('input', { class: 'input', id: 'sname', autocomplete: 'off', 'aria-describedby': 'nameErr' });
+  nameInput.value = state.name;
+  const sidErr = errorEl('sidErr'), nameErr = errorEl('nameErr');
+  sidInput.addEventListener('input', function () { state.sid = sidInput.value.replace(/\D/g, '').slice(0, 5); sidInput.value = state.sid; clearError(sidErr, sidInput); storeSet(); });
+  nameInput.addEventListener('input', function () { state.name = nameInput.value; clearError(nameErr, nameInput); storeSet(); });
   root.appendChild(h('section', { class: 'card' }, [
     h('h1', { text: INTRO.title }),
     h('p', { class: 'lead', text: INTRO.notice }),
     h('h2', { text: UI.flowTitle }),
-    h('ol', { class: 'step-list' }, INTRO.steps.map(function (s) { return h('li', { text: s }); })),
-    h('button', { type: 'button', class: 'btn btn-primary', onclick: function () { state.fromSummary = false; go('review'); } }, [UI.start, svg(ICON.chev)])
+    h('ol', { class: 'step-list' }, INTRO.steps.map(function (s) { return h('li', { text: s }); }))
   ]));
+  root.appendChild(h('section', { class: 'card' }, [
+    h('h2', { text: UI.idTitle }),
+    h('div', { class: 'id-grid' }, [
+      h('div', { class: 'field' }, [h('label', { class: 'field-label', for: 'sid', text: UI.sidLabel }), sidInput, sidErr]),
+      h('div', { class: 'field' }, [h('label', { class: 'field-label', for: 'sname', text: UI.nameLabel }), nameInput, nameErr])
+    ])
+  ]));
+  root.appendChild(h('button', { type: 'button', class: 'btn btn-primary', onclick: function () {
+    if (!/^\d{5}$/.test(state.sid)) { showError(sidErr, UI.needSid, sidInput); return; }
+    if (!state.name.trim()) { showError(nameErr, UI.needName, nameInput); return; }
+    state.fromSummary = false; startGuard(); go('review');
+  } }, [UI.start, svg(ICON.chev)]));
 }
 
 /* ───────── 화면: 복습 (순서 맞추기) ───────── */
@@ -606,6 +629,31 @@ function copyText(text, onOk) {
   } else fallback();
 }
 
+async function submitRecord(btn) {
+  if (PREVIEW) { toast(UI.submitPreview); return; }
+  const body = {
+    studentId: state.sid, studentName: state.name, gameName: CONFIG.GAME_NAME,
+    choiceSummary: judgeText().replace(/\.$/, '') + ' / ' + reText(),
+    diffSummary: '',
+    reflection: buildCopyText(),
+    choicesJson: JSON.stringify({ review: { attempts: state.attempts, order: state.order }, a: state.a, d: state.d,
+      judge: state.judge, judgeReason: state.judgeReason, chips: state.chips, chipWhy: state.chipWhy, re: state.re, reReason: state.reReason })
+  };
+  Object.assign(body, window.FocusGuard ? FocusGuard.payload() : {});
+  btn.disabled = true; btn.textContent = UI.submitting;
+  try {
+    const res = await fetch(CONFIG.SHEET_WEBAPP_URL, { method: 'POST', body: JSON.stringify(body) });
+    const out = await res.json().catch(function () { return null; });
+    if (!out || out.result === 'error') throw new Error((out && out.message) || UI.submitFail);
+    state.submitted = true; storeSet();
+    toast(UI.submitted);
+  } catch (e) {
+    toast(e && e.message ? e.message : UI.submitFail);
+  }
+  btn.disabled = false;
+  btn.textContent = state.submitted ? UI.submitAgain : UI.submit;
+}
+
 function recapBlock(title, step, rows) {
   return h('div', { class: 'recap' }, [
     h('div', { class: 'recap-head' }, [
@@ -621,6 +669,7 @@ function renderSummary(root) {
   const a = state.a, d = state.d;
   const ok = allDone();
   const copyBtn = h('button', { type: 'button', class: 'btn btn-primary btn-wide', id: 'copyBtn', disabled: !ok, onclick: function () { copyText(buildCopyText()); } }, UI.copy);
+  const submitBtn = h('button', { type: 'button', class: 'btn btn-wide', id: 'subBtn', disabled: !ok, onclick: function (e) { submitRecord(e.currentTarget); } }, state.submitted ? UI.submitAgain : UI.submit);
   root.appendChild(h('section', { class: 'card' }, [
     h('h2', { text: UI.summaryTitle }),
     h('p', { class: 'lead', text: UI.summaryLead }),
@@ -631,6 +680,7 @@ function renderSummary(root) {
     recapBlock(UI.summaryEv, 'evidence', [[UI.pickedLabel, state.chips.map(chipLabel).join(', ')], [UI.whyLabel, state.chipWhy]]),
     recapBlock(UI.summaryRe, 'extra', [[UI.myJudge, reText()]].concat(state.reReason.trim() ? [[UI.whyLabel, state.reReason]] : [])),
     copyBtn,
+    submitBtn,
     ok ? null : h('p', { class: 'muted', text: UI.needAll }),
     h('button', { type: 'button', class: 'btn btn-outline btn-wide', onclick: confirmRestart }, UI.restart)
   ]));
@@ -644,7 +694,7 @@ function confirmRestart() {
   const cancel = h('button', { type: 'button', class: 'btn', onclick: close }, UI.cancel);
   const erase = h('button', { type: 'button', class: 'btn btn-critical', onclick: function () {
     root.textContent = ''; storeDel();
-    state = freshState();
+    state = freshState(state.sid, state.name);
     storeSet(); go('intro');
   } }, UI.erase);
   const box = h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mdTitle' }, [
@@ -678,12 +728,22 @@ function render() {
   else if (st === 'evidence') renderEvidence(root);
   else if (st === 'extra') renderExtra(root);
   else renderSummary(root);
+  if (window.Glossary) Glossary.refresh();
+}
+
+let startedGuard = false;
+function startGuard() {
+  if (startedGuard || !window.FocusGuard || !/^\d{5}$/.test(state.sid)) return;
+  startedGuard = true;
+  FocusGuard.start({ key: CONFIG.GAME_NAME + ':' + state.sid });
 }
 
 /* ───────── 부팅 (함수 선언이 모두 끝난 뒤 맨 마지막에 실행) ───────── */
 function init() {
+  const qSid = (params.get('sid') || '').replace(/\D/g, '').slice(0, 5);
+  const qName = (params.get('name') || '').trim();
   const saved = storeGet();
-  if (saved && STEPS.indexOf(saved.step) >= 0) {
+  if (saved && STEPS.indexOf(saved.step) >= 0 && (!qSid || qSid === saved.sid)) {
     state = Object.assign(freshState(), saved);
     state.a = Object.assign({ view: '', quote: '' }, saved.a);
     state.d = Object.assign({ view: '', diff: '', why: '' }, saved.d);
@@ -692,7 +752,16 @@ function init() {
     if (!okOrder) state.order = shuffledOrder();
     state.step = gate(state.step);
   }
-  if (PREVIEW) document.getElementById('previewBanner').hidden = false;
+  if (qSid && !state.sid) state.sid = qSid;
+  if (qName && !state.name) state.name = qName;
+  if (PREVIEW) {
+    if (!state.sid) state.sid = '20599';
+    if (!state.name) state.name = '미리보기 학생';
+    document.getElementById('previewBanner').hidden = false;
+  }
+  state.step = gate(state.step);
+  if (state.step !== 'intro') startGuard();
+  Glossary.start({ terms: GLOSSARY, unique: true, skip: ['.topbar', '.recap', '.modal', '.choices', '.my-judge', '.source-cite', '.cite-line', '.order-name'] });
   render();
 }
 init();
