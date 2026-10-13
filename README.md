@@ -6,6 +6,7 @@
 - 화면 흐름: 시작 → 복습(순서 맞추기: 드래그 + ▲▼) → 연표 확인 → 자료 1(윌리엄스) → 자료 2(1904년 역사책) → 판단 → 근거 고르기 → 추가 정보·재판단 → 마무리(내 글 복사)
 - 추가 정보 카드는 판단·근거를 저장한 뒤에만 열린다(`gate()`가 앞 단계를 마치지 않으면 그 단계로 돌려보낸다).
 - URL 파라미터: `?sid=학번&name=이름` 자동채움, `?preview=1` 미리보기(학번·이름 자동채움, 저장·제출 안 함).
+- 패들렛: "내 글 복사하기"에 성공하면 그 아래에 "패들렛 열기" 버튼이 나온다(복사 전엔 숨김). 주소는 `CONFIG.PADLET_URL` 또는 포털이 넘기는 `?padlet=https://padlet.com/...`(padlet.com만 허용). 주소가 없으면 버튼 대신 "포털의 내 패들렛 열기로 가서 붙여넣어 주세요" 안내만 나온다. 새 창으로 열 때 `FocusGuard`는 padlet.com을 자동으로 이탈에서 뺀다.
 - 내보내기: 마무리 화면의 "내 글 복사하기"(패들렛용)와 "기록하기"(history26_backend 기본 제출 경로, `gameName` 필수, 새 action 없음). 기록하기 body는 `studentId·studentName·gameName·choiceSummary·diffSummary·reflection·choicesJson`에 `FocusGuard.payload()`를 더한 것이다. `reflection`은 복사 문자열과 같다.
 - 저장: 입력은 `localStorage`(`napoleon_state_v1`)에 임시 저장하므로 `DraftGuard`는 쓰지 않는다(웹앱 빌더 스킬: 앱이 이미 자기 localStorage에 저장하면 중복). 막혀도 앱은 동작한다.
 - 임시값: `CONFIG.GAME_NAME = '나폴레옹_쿠데타평가'` — 포털 커리큘럼 id가 정해지면 정확히 일치하게 교체.

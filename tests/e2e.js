@@ -242,6 +242,29 @@ function swapAdj(arr, k) { const a = arr.slice(); [a[k], a[k + 1]] = [a[k + 1], 
     ok(posts === 0 && (await page.innerText('#toast')).includes('미리보기에서는 저장하지 않아요'), '?preview=1: 서버로 보내지 않음');
     await ctx.close();
   }
+  // 복사 뒤 패들렛 버튼
+  {
+    const ctx = await browser.newContext({ viewport: { width: 360, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
+    const page = await ctx.newPage();
+    const setup = () => page.evaluate(() => { state.reviewDone = true; state.a = { view: '좋게 본다', quote: 'q' }; state.d = { view: '나쁘게 본다', diff: 'd', why: '' }; state.judge = 'A'; state.judgeReason = 'r'; state.chips = ['A1']; state.chipWhy = 'w'; state.re = 'keep'; go('summary'); });
+    await page.goto(URL_ + '?preview=1&padlet=https%3A%2F%2Fpadlet.com%2Ftest%2Fabc');
+    await page.click('text=시작하기'); await setup();
+    ok(await page.$('#padBtn') === null, '복사 전에는 패들렛 버튼 없음');
+    await page.click('#copyBtn');
+    await page.waitForSelector('#padBtn');
+    ok(await page.isVisible('#padBtn'), '복사 성공 뒤 패들렛 열기 버튼 노출');
+    ok((await page.evaluate(() => navigator.clipboard.readText())).startsWith('[복습]'), '클립보드에 내 글이 들어감');
+    await page.evaluate(() => { window.__opened = null; window.open = (u, t, f) => { window.__opened = [u, t, f]; }; });
+    await page.click('#padBtn');
+    const op = await page.evaluate(() => window.__opened);
+    ok(op && op[0] === 'https://padlet.com/test/abc' && op[1] === '_blank' && /noopener/.test(op[2]), '패들렛 열기: padlet.com 주소를 새 창으로');
+    await page.goto(URL_ + '?preview=1&padlet=https%3A%2F%2Fevil.example%2Fx');
+    await page.click('text=시작하기'); await setup();
+    await page.click('#copyBtn');
+    await page.waitForSelector('#padAfter:not([hidden])');
+    ok(await page.$('#padBtn') === null && (await page.innerText('#padAfter')).includes('포털의 "내 패들렛 열기"'), 'padlet.com이 아닌 주소는 버튼 대신 포털 안내');
+    await ctx.close();
+  }
   // 낱말 풀이 밑줄
   {
     const ctx = await browser.newContext({ viewport: { width: 360, height: 900 } });

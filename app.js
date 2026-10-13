@@ -31,7 +31,8 @@ const UI = {
   summaryTitle: '내 글 확인하고 복사하기',
   summaryLead: '쓴 내용을 확인하고, 아래 버튼으로 글을 복사해 패들렛에 올려요.',
   editStep: '이 화면으로',
-  copy: '내 글 복사하기', copied: '복사했어요', copyFail: '복사하지 못했어요. 글을 직접 선택해서 복사해 주세요',
+  copy: '내 글 복사하기', copied: '복사했어요',
+  padletOpen: '패들렛 열기', padletNoUrl: '복사했어요. 포털의 "내 패들렛 열기"로 가서 붙여넣어 주세요.', padletCopied: '복사했어요. 패들렛에 붙여넣어 주세요', copyFail: '복사하지 못했어요. 글을 직접 선택해서 복사해 주세요',
   needAll: '모든 필수 칸을 채우면 복사할 수 있어요',
   restart: '처음부터 다시하기',
   restartTitle: '처음부터 다시 할까요?', restartBody: '쓴 내용이 모두 지워져요.', cancel: '취소', erase: '지우기',
@@ -618,18 +619,18 @@ function buildCopyText() {
   lines.push('[정보 뒤] ' + reText() + (oneLine(state.reReason) ? ' / ' + oneLine(state.reReason) : ''));
   return lines.join('\n');
 }
-function copyText(text, onOk) {
+function copyText(text, okMsg, onOk) {
   const fallback = function () {
     const ta = h('textarea', { 'aria-hidden': 'true', style: 'position:fixed;left:-9999px;top:0' });
     ta.value = text; document.body.appendChild(ta); ta.select();
     let ok = false;
     try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
     document.body.removeChild(ta);
-    toast(ok ? UI.copied : UI.copyFail);
+    toast(ok ? (okMsg || UI.copied) : UI.copyFail);
     if (ok && onOk) onOk();
   };
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(function () { toast(UI.copied); if (onOk) onOk(); }, fallback);
+    navigator.clipboard.writeText(text).then(function () { toast(okMsg || UI.copied); if (onOk) onOk(); }, fallback);
   } else fallback();
 }
 
@@ -658,6 +659,14 @@ async function submitRecord(btn) {
   btn.textContent = state.submitted ? UI.submitAgain : UI.submit;
 }
 
+/* 패들렛 주소: CONFIG.PADLET_URL 또는 포털이 넘기는 ?padlet=주소(https, padlet.com만 허용) */
+function padletUrl() {
+  let url = CONFIG.PADLET_URL;
+  const q = params.get('padlet');
+  if (q) { try { const u = new URL(q); if (u.protocol === 'https:' && /(^|\.)padlet\.com$/.test(u.hostname)) url = u.href; } catch (e) { /* 무시 */ } }
+  return url;
+}
+
 function recapBlock(title, step, rows) {
   return h('div', { class: 'recap' }, [
     h('div', { class: 'recap-head' }, [
@@ -672,7 +681,18 @@ function renderSummary(root) {
   state.fromSummary = false; storeSet();
   const a = state.a, d = state.d;
   const ok = allDone();
-  const copyBtn = h('button', { type: 'button', class: 'btn btn-primary btn-wide', id: 'copyBtn', disabled: !ok, onclick: function () { copyText(buildCopyText()); } }, UI.copy);
+  /* 복사에 성공한 뒤에야 패들렛 버튼이 나온다(복사 전엔 숨김). 주소가 없으면 포털에서 열도록 안내만 보인다 */
+  const url = padletUrl();
+  const padBox = h('div', { class: 'pad-after', id: 'padAfter', hidden: true });
+  const showPad = function () {
+    padBox.textContent = '';
+    if (url) padBox.appendChild(h('button', { type: 'button', class: 'btn btn-primary btn-wide', id: 'padBtn', onclick: function () {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } }, [UI.padletOpen, svg('M6 3.5H3.5v9h9V10M9 3.5h3.5V7M12.5 3.5L7.5 8.5')]));
+    else padBox.appendChild(h('p', { class: 'muted', text: UI.padletNoUrl }));
+    padBox.hidden = false;
+  };
+  const copyBtn = h('button', { type: 'button', class: 'btn btn-primary btn-wide', id: 'copyBtn', disabled: !ok, onclick: function () { copyText(buildCopyText(), UI.padletCopied, showPad); } }, UI.copy);
   const submitBtn = h('button', { type: 'button', class: 'btn btn-wide', id: 'subBtn', disabled: !ok, onclick: function (e) { submitRecord(e.currentTarget); } }, state.submitted ? UI.submitAgain : UI.submit);
   root.appendChild(h('section', { class: 'card' }, titleBlock('summary', UI.summaryTitle).concat([
     h('p', { class: 'lead', text: UI.summaryLead }),
@@ -683,6 +703,7 @@ function renderSummary(root) {
     recapBlock(UI.summaryEv, 'evidence', [[UI.pickedLabel, state.chips.map(chipLabel).join(', ')], [UI.whyLabel, state.chipWhy]]),
     recapBlock(UI.summaryRe, 'extra', [[UI.myJudge, reText()]].concat(state.reReason.trim() ? [[UI.whyLabel, state.reReason]] : [])),
     copyBtn,
+    padBox,
     submitBtn,
     ok ? null : h('p', { class: 'muted', text: UI.needAll }),
     h('button', { type: 'button', class: 'btn btn-outline btn-wide', onclick: confirmRestart }, UI.restart)

@@ -308,3 +308,6 @@ button.term { text-decoration-thickness: 1px; text-decoration-color: var(--strok
 .info-card { background: var(--bg-layer-basement); padding: var(--x4) var(--x4) var(--x4) var(--x5); }
 .step-list { gap: var(--x2); }
 @media (min-width: 600px) { .card { padding: var(--x6); } .passage-text { font-size: 19px; line-height: 33px; } }
+
+/* 복사 성공 뒤에 나오는 패들렛 영역 */
+.pad-after { display: flex; flex-direction: column; gap: var(--x2); }
