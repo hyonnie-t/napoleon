@@ -166,6 +166,22 @@ function swapAdj(arr, k) { const a = arr.slice(); [a[k], a[k + 1]] = [a[k + 1], 
     await page.click('text=정보 더 보기');
     ok(await page.isVisible('#errWhy'), '근거: 이유 막힘');
     await page.fill('textarea[aria-label^="고른 자료의 어떤 점"]', '쓴 사람과 쓴 때가 달라서 입장이 갈렸다.');
+    // 맞서는 말: 고른 칩(A1, D2)은 후보에서 빠지고, 필수로 막힌다
+    ok(await page.locator('input[name="counter"]').count() === 2, '맞서는 말 후보는 고르지 않은 자료 2개');
+    await page.click('text=정보 더 보기');
+    ok(await page.isVisible('#errCounter'), '맞서는 말: 선택 막힘');
+    await page.locator('input[name="counter"]').nth(1).check({ force: true });
+    await page.click('text=정보 더 보기');
+    ok(await page.isVisible('#errCounterWhy'), '맞서는 말: 답 막힘');
+    // 맞서는 말로 고른 자료를 근거 칩으로 바꾸면 맞서는 말이 비워진다
+    await boxes.nth(2).check({ force: true }).catch(() => {});
+    await boxes.nth(0).uncheck({ force: true });
+    await boxes.nth(2).check({ force: true });
+    ok((await page.evaluate(() => state.counter)) === '' && await page.locator('input[name="counter"]').count() === 2, '근거 칩과 겹치면 맞서는 말이 비워짐');
+    await boxes.nth(2).uncheck({ force: true });
+    await boxes.nth(0).check({ force: true });
+    await page.locator('input[name="counter"]').nth(1).check({ force: true });
+    await page.fill('textarea[aria-label^="그 말이 있는데도"]', '단검 이야기가 거짓이어도 헌법 위반은 따로 따져야 한다.');
     await page.screenshot({ path: path.join(OUT, `evidence_${width}.png`), fullPage: true });
     await page.click('text=정보 더 보기');
 
@@ -198,7 +214,8 @@ function swapAdj(arr, k) { const a = arr.slice(); [a[k], a[k + 1]] = [a[k + 1], 
       '[자료 1] 쿠데타를 보는 눈: 좋게 본다 / 그렇게 읽은 말: 합법적인 권리로 높은 권력에 부름받은 시민',
       '[자료 2] 쿠데타를 보는 눈: 나쁘게 본다 / 두 자료의 다른 점: 자료 1은 합법적인 권리라고 했고 자료 2는 헌법을 노골적으로 어겼다고 했다.',
       '[평가] 판단: 지금 자료로는 한쪽으로 정하기 어렵다 / 이유: 고친 이유 한 문장.',
-      '[근거] 자료 1 · 글쓴이가 본 일, 자료 2 · 단검 이야기 / 쓴 사람과 쓴 때가 달라서 입장이 갈렸다.',
+      '[근거] 자료 2 · 단검 이야기, 자료 1 · 글쓴이가 본 일 / 쓴 사람과 쓴 때가 달라서 입장이 갈렸다.',
+      '[맞서는 말] 자료 2 · 원로회의 결정은 합법이었을까 / 단검 이야기가 거짓이어도 헌법 위반은 따로 따져야 한다.',
       '[정보 뒤] 조금 고쳤다'
     ].join('\n');
     ok(copied === expected, '복사 문자열이 5-5 형식과 일치');
@@ -236,7 +253,7 @@ function swapAdj(arr, k) { const a = arr.slice(); [a[k], a[k + 1]] = [a[k + 1], 
     await page.click('text=시작하기');
     ok(await page.$('#orderList') !== null, '?preview=1: 입력 없이 시작');
     ok(await page.evaluate(() => localStorage.getItem(CONFIG.STORE_KEY)) === null, '?preview=1: 저장하지 않음');
-    await page.evaluate(() => { state.reviewDone = true; state.a = { view: 'x', quote: 'x' }; state.d = { view: 'x', diff: 'x', why: '' }; state.judge = 'A'; state.judgeReason = 'x'; state.chips = ['A1']; state.chipWhy = 'x'; state.re = 'keep'; go('summary'); });
+    await page.evaluate(() => { state.reviewDone = true; state.a = { view: 'x', quote: 'x' }; state.d = { view: 'x', diff: 'x', why: '' }; state.judge = 'A'; state.judgeReason = 'x'; state.chips = ['A1']; state.chipWhy = 'x'; state.counter = 'D1'; state.counterWhy = 'x'; state.re = 'keep'; go('summary'); });
     await page.click('#subBtn');
     await page.waitForTimeout(300);
     ok(posts === 0 && (await page.innerText('#toast')).includes('미리보기에서는 저장하지 않아요'), '?preview=1: 서버로 보내지 않음');
@@ -246,7 +263,7 @@ function swapAdj(arr, k) { const a = arr.slice(); [a[k], a[k + 1]] = [a[k + 1], 
   {
     const ctx = await browser.newContext({ viewport: { width: 360, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
     const page = await ctx.newPage();
-    const setup = () => page.evaluate(() => { state.reviewDone = true; state.a = { view: '좋게 본다', quote: 'q' }; state.d = { view: '나쁘게 본다', diff: 'd', why: '' }; state.judge = 'A'; state.judgeReason = 'r'; state.chips = ['A1']; state.chipWhy = 'w'; state.re = 'keep'; go('summary'); });
+    const setup = () => page.evaluate(() => { state.reviewDone = true; state.a = { view: '좋게 본다', quote: 'q' }; state.d = { view: '나쁘게 본다', diff: 'd', why: '' }; state.judge = 'A'; state.judgeReason = 'r'; state.chips = ['A1']; state.chipWhy = 'w'; state.counter = 'D1'; state.counterWhy = 'w'; state.re = 'keep'; go('summary'); });
     await page.goto(URL_ + '?preview=1&padlet=https%3A%2F%2Fpadlet.com%2Ftest%2Fabc');
     await page.click('text=시작하기'); await setup();
     ok(await page.$('#padBtn') === null, '복사 전에는 패들렛 버튼 없음');

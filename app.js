@@ -24,7 +24,7 @@ const UI = {
   toNextSource: '다음 자료로', toJudge: '평가하러 가기', toEvidence: '근거 고르러 가기', toExtra: '정보 더 보기', toSummary: '마무리로',
   judgeTitle: '쿠데타 평가하기',
   myAnswers: '내가 쓴 것 보기 (자료 1·2)',
-  evidenceTitle: '내 판단을 뒷받침하는 근거 고르기',
+  evidenceTitle: '근거를 고르고, 맞서는 말 살펴보기',
   myJudge: '내 판단',
   rereadSources: '자료 다시 보기',
   extraTitle: COMMENTARY.title,
@@ -43,6 +43,9 @@ const UI = {
   needQuote: '글에서 찾은 말을 적어 주세요',
   needDiff: '다르게 말하는 부분을 적어 주세요',
   needChip: '자료를 1개 이상 골라 주세요',
+  needCounter: '가장 안 맞는 말을 하나 골라 주세요',
+  needCounterWhy: '그 말에 어떻게 답할지 한 문장 적어 주세요',
+  counterLabel: '맞서는 말', counterAnsLabel: '그 말에 대한 내 답',
   needRe: '하나를 골라 주세요',
   summaryReview: '복습', summaryA: '자료 1', summaryD: '자료 2', summaryJudge: '평가', summaryEv: '근거', summaryRe: '정보 뒤',
   viewLabel: '쿠데타를 보는 눈', quoteLabel: '그렇게 읽은 말', diffLabel: '두 자료의 다른 점', whyLabel: '이유',
@@ -74,7 +77,7 @@ function shuffledOrder() {
 function freshState(sid, name) {
   return { sid: sid || '', name: name || '', submitted: false, step: 'intro', order: shuffledOrder(), attempts: 0, reviewDone: false, fromSummary: false,
     a: { view: '', quote: '' }, d: { view: '', diff: '', why: '' },
-    judge: '', judgeReason: '', chips: [], chipWhy: '', re: '', reReason: '' };
+    judge: '', judgeReason: '', chips: [], chipWhy: '', counter: '', counterWhy: '', re: '', reReason: '' };
 }
 
 /* ───────── DOM 도우미 ───────── */
@@ -141,7 +144,7 @@ function isCorrectOrder(order) { return order.every(function (id, i) { return id
 function s1Ok() { return !!state.a.view && !!state.a.quote.trim(); }
 function s2Ok() { return !!state.d.view && !!state.d.diff.trim(); }
 function judgeOk() { return !!state.judge && !!state.judgeReason.trim(); }
-function evOk() { return state.chips.length >= 1 && !!state.chipWhy.trim(); }
+function evOk() { return state.chips.length >= 1 && !!state.chipWhy.trim() && !!state.counter && state.chips.indexOf(state.counter) < 0 && !!state.counterWhy.trim(); }
 function reOk() { return !!state.re; }
 function stepDone(step) {
   switch (step) {
@@ -550,10 +553,24 @@ function renderEvidence(root) {
       } else {
         state.chips = state.chips.filter(function (x) { return x !== input.value; });
       }
+      if (state.counter && state.chips.indexOf(state.counter) >= 0) state.counter = '';
+      drawCounter();
       clearError(errChip); storeSet();
     }));
   });
   const ta = textareaField(state.chipWhy, function (v) { state.chipWhy = v; clearError(errWhy, ta); storeSet(); }, EVIDENCE.whyLabel, 3);
+  /* 맞서는 말: 내 판단과 가장 안 맞는 말 하나를 위에서 고른 자료 밖에서 고르고, 그 말에 어떻게 답할지 쓴다 */
+  const errCounter = errorEl('errCounter'), errCounterWhy = errorEl('errCounterWhy');
+  const counterWrap = h('div', { id: 'counterWrap' });
+  function drawCounter() {
+    counterWrap.textContent = '';
+    const items = allPassages().filter(function (it) { return state.chips.indexOf(it.p.id) < 0; })
+      .map(function (it) { return { value: it.p.id, label: '자료 ' + it.src.no + ' · ' + it.p.label }; });
+    counterWrap.appendChild(radioGroup(labelWithTag(EVIDENCE.counterPickLabel, true), 'counter', items, state.counter,
+      function (v) { state.counter = v; clearError(errCounter); storeSet(); }));
+  }
+  drawCounter();
+  const taCounter = textareaField(state.counterWhy, function (v) { state.counterWhy = v; clearError(errCounterWhy, taCounter); storeSet(); }, EVIDENCE.counterWhyLabel, 3);
   const reread = h('details', {}, [
     h('summary', {}, [svg(ICON.chev), UI.rereadSources]),
     h('div', { class: 'details-body' }, allPassages().map(function (it) {
@@ -565,6 +582,9 @@ function renderEvidence(root) {
     reread,
     fs, errChip,
     h('div', { class: 'field' }, [h('label', { class: 'field-label' }, labelWithTag(EVIDENCE.whyLabel, true)), ta, errWhy]),
+    h('hr', { class: 'divider' }),
+    counterWrap, errCounter,
+    h('div', { class: 'field' }, [h('label', { class: 'field-label' }, labelWithTag(EVIDENCE.counterWhyLabel, true)), taCounter, errCounterWhy]),
     hintBox(EVIDENCE.hint),
     navRow({
       prev: prevHandler(),
@@ -572,6 +592,8 @@ function renderEvidence(root) {
       next: function () {
         if (state.chips.length < 1) { showError(errChip, UI.needChip, fs.querySelector('input')); return; }
         if (!state.chipWhy.trim()) { showError(errWhy, UI.needReason, ta); return; }
+        if (!state.counter) { showError(errCounter, UI.needCounter, counterWrap.querySelector('input')); return; }
+        if (!state.counterWhy.trim()) { showError(errCounterWhy, UI.needCounterWhy, taCounter); return; }
         afterStep();
       }
     })
@@ -616,6 +638,7 @@ function buildCopyText() {
   lines.push('[자료 2] ' + UI.viewLabel + ': ' + d.view + ' / ' + UI.diffLabel + ': ' + oneLine(d.diff) + (oneLine(d.why) ? ' / ' + UI.whyLabel + ': ' + oneLine(d.why) : ''));
   lines.push('[평가] ' + UI.judgeLabel + ': ' + judgeText().replace(/\.$/, '') + ' / ' + UI.whyLabel + ': ' + oneLine(state.judgeReason));
   lines.push('[근거] ' + state.chips.map(chipLabel).join(', ') + ' / ' + oneLine(state.chipWhy));
+  lines.push('[' + UI.counterLabel + '] ' + chipLabel(state.counter) + ' / ' + oneLine(state.counterWhy));
   lines.push('[정보 뒤] ' + reText() + (oneLine(state.reReason) ? ' / ' + oneLine(state.reReason) : ''));
   return lines.join('\n');
 }
@@ -642,7 +665,7 @@ async function submitRecord(btn) {
     diffSummary: '',
     reflection: buildCopyText(),
     choicesJson: JSON.stringify({ review: { attempts: state.attempts, order: state.order }, a: state.a, d: state.d,
-      judge: state.judge, judgeReason: state.judgeReason, chips: state.chips, chipWhy: state.chipWhy, re: state.re, reReason: state.reReason })
+      judge: state.judge, judgeReason: state.judgeReason, chips: state.chips, chipWhy: state.chipWhy, counter: state.counter, counterWhy: state.counterWhy, re: state.re, reReason: state.reReason })
   };
   Object.assign(body, window.FocusGuard ? FocusGuard.payload() : {});
   btn.disabled = true; btn.textContent = UI.submitting;
@@ -700,7 +723,7 @@ function renderSummary(root) {
     recapBlock(UI.summaryA, 's1', [[UI.viewLabel, a.view], [UI.quoteLabel, a.quote]]),
     recapBlock(UI.summaryD, 's2', [[UI.viewLabel, d.view], [UI.diffLabel, d.diff]].concat(d.why.trim() ? [[UI.whyLabel, d.why]] : [])),
     recapBlock(UI.summaryJudge, 'judge', [[UI.judgeLabel, judgeText()], [UI.whyLabel, state.judgeReason]]),
-    recapBlock(UI.summaryEv, 'evidence', [[UI.pickedLabel, state.chips.map(chipLabel).join(', ')], [UI.whyLabel, state.chipWhy]]),
+    recapBlock(UI.summaryEv, 'evidence', [[UI.pickedLabel, state.chips.map(chipLabel).join(', ')], [UI.whyLabel, state.chipWhy], [UI.counterLabel, state.counter ? chipLabel(state.counter) : ''], [UI.counterAnsLabel, state.counterWhy]]),
     recapBlock(UI.summaryRe, 'extra', [[UI.myJudge, reText()]].concat(state.reReason.trim() ? [[UI.whyLabel, state.reReason]] : [])),
     copyBtn,
     padBox,
